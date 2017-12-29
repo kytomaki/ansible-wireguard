@@ -1,0 +1,31 @@
+[Interface]
+Address = {{ wireguard_ip }}/32
+SaveConfig = false
+ListenPort = {{ wireguard_port }}
+PrivateKey = {{ wireguard_private_key }}
+
+{% for host in groups['wireguard'] -%}
+{% if not ansible_default_ipv4.address == hostvars[host]['ansible_default_ipv4']['address'] -%}
+[Peer]
+PublicKey = {{ hostvars[host]['wireguard_public_key'] }}
+{% if wireguard_preshared_key is defined and wireguard_preshared_key|length -%}
+PreSharedKey = {{ wireguard_preshared_key }}
+{% endif -%}
+AllowedIPs = {{ hostvars[host]['wireguard_ip'] }}/32
+Endpoint = {{ hostvars[host]['ansible_default_ipv4']['address'] }}:{{ wireguard_port }}
+{% endif -%}
+{% endfor -%}
+
+{% if extra_peers is defined and extra_peers|length -%}
+{% for peer in extra_peers -%}
+[Peer]
+PublicKey = {{ peer.public_key }}
+{% if (peer.preshared_key is defined and peer.preshared_key|length) or (wireguard_preshared_key is defined and wireguard_preshared_key|length) -%}
+PreSharedKey = {{ peer.preshared_key | default(wireguard_preshared_key) }}
+{% endif -%}
+AllowedIPs = {{ peer.allowed_ips }}
+{%- if peer.endpoint is defined and peer.endpoint|length -%}
+Endpoint = {{ peer.endpoint }}
+{% endif -%}
+{% endfor -%}
+{% endif -%}

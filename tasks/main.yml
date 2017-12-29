@@ -1,0 +1,97 @@
+---
+
+- name: Add backports apt-repository
+  apt_repository:
+    repo: "{{ wireguard_debian_repo }}"
+    filename: unstable-wireguard
+  become: yes
+  tags:
+    - wireguard
+    - apt
+    - repo
+
+- name: Apt-pin unstable
+  copy:
+    dest: /etc/apt/preferences.d/limit-backports
+    mode: '0444'
+    content: "Package: *\nPin: release a=buster-backports\nPin-Priority: 150\n"
+  become: yes
+  tags:
+    - wireguard
+    - apt
+    - repo
+
+- name: Install wireguard packages
+  apt:
+    name:  ['wireguard-dkms', 'wireguard-tools']
+  become: yes
+  tags:
+    - wireguard
+    - package
+
+- name: Create wireguard private key
+  shell: "umask; 077; wg genkey > /etc/wireguard/privatekey"
+  args:
+    creates: /etc/wireguard/privatekey
+  become: yes
+  tags:
+    - wireguard
+
+- name: Create wireguard public key
+  shell: "wg pubkey < /etc/wireguard/privatekey > /etc/wireguard/pubkey"
+  args:
+    creates: /etc/wireguard/pubkey
+  become: yes
+  tags:
+    - wireguard
+
+- name: Register private and public key
+  command: cat {{ item }}
+  register: wireguard_keys
+  with_items:
+    - /etc/wireguard/privatekey
+    - /etc/wireguard/pubkey
+  become: yes
+  tags:
+    - wireguard
+  changed_when: false
+
+- name: Set wireguard facts
+  set_fact:
+    wireguard_private_key: "{{ wireguard_keys.results[0].stdout }}"
+    wireguard_public_key: "{{ wireguard_keys.results[1].stdout }}"
+    cacheable: true
+  tags:
+    - wireguard
+
+- name: Generate wireguard conf
+  template:
+    src: wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    owner: root
+    group: root
+    mode: 0600
+  become: yes
+  notify:
+    - Restart wireguard service
+  tags:
+    - wireguard
+
+- name: Enable wireguard service
+  systemd:
+    name: wg-quick@wg0.service
+    enabled: yes
+    state: started
+  become: yes
+  tags:
+    - wireguard
+
+- name: Populate hosts file
+  lineinfile:
+    dest: /etc/hosts
+    regexp: '{{ item }}$'
+    line:  "{{ hostvars[item].wireguard_ip }} {{item}}"
+    state: present
+  when: hostvars[item].wireguard_ip is defined
+  become: yes
+  loop: "{{ groups['wireguard'] }}"
