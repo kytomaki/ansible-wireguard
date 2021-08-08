@@ -90,7 +90,7 @@
   lineinfile:
     dest: /etc/hosts
     regexp: '{{ item }}$'
-    line:  "{{ hostvars[item].wireguard_ip }} {{item}}"
+    line:  "{{ hostvars[item].wireguard_ip }} {{ item }}"
     state: present
   when: hostvars[item].wireguard_ip is defined
   become: yes
