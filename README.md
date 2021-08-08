@@ -1,3 +1,5 @@
+![Ansible lint](https://github.com/kytomaki/ansible-wireguard/actions/workflows/ansible-lint.yml/badge.svg)
+
 Wireguard
 =========
 
